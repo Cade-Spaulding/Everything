@@ -71,8 +71,6 @@ def botScore(bot,board,turn):
                     score-=bot[18+5*j+6-dot]
                 if s[0]=='W':
                     score+=bot[18+5*j+dot-1]
-    if turn=='B':
-        score*=-1
     return score
 def winCheck(board):
     kingDead=0
@@ -140,7 +138,10 @@ def getMoves(board,turn):
 LL=[10,4,2,.5,.25,.25,1,1,1.2,4,2,.15,.5,.5,4,2,1,.3,5,2,1,3,2.5,2,1,.25,2]
 def score(board,turn,boards):
     if winCheck(board):
-        return -100
+        if turn=='W':
+            return -100
+        else:
+            return 100
     score=0
     BKL=[0,0]
     WKL=[0,0]
@@ -202,36 +203,28 @@ def score(board,turn,boards):
                             control+=1
             s=board[dot][stripe]
             if s==['B','']:
-                score-=1.6+4/(2+(WKL[0]-dot)**2+(WKL[1]-stripe)**2)
-                for i in J:
-                    for k in J:
-                        if board[dot+i][stripe+k]==['B',''] or ['B','K']:
-                            score-=.15
+                score-=.8+4/(2+(WKL[0]-dot)**2+(WKL[1]-stripe)**2)
                 if dot in [1,6] and stripe in [1,6]:
                     score+=.2
             elif s==['W','']:
-                score+=1.6+4/(2+(BKL[0]-dot)**2+(BKL[1]-stripe)**2)
-                for i in J:
-                    for k in J:
-                        if board[dot+i][stripe+k]==['W',''] or ['W','K']:
-                            score+=.15
+                score+=.8+4/(2+(BKL[0]-dot)**2+(BKL[1]-stripe)**2)
                 if dot in [1,6] and stripe in [1,6]:
                     score-=.2
             elif s==['B','+']:
-                score-=.8+4/(2+(WKL[0]-dot)**2+(WKL[1]-stripe)**2)
+                score-=.4+4/(2+(WKL[0]-dot)**2+(WKL[1]-stripe)**2)
                 if dot in [1,6] and stripe in [1,6]:
                     score+=.4
             elif s==['B','X']:
-                score-=.8+5/(2+(WKL[0]-dot)**2+(WKL[1]-stripe)**2)
+                score-=.4+5/(2+(WKL[0]-dot)**2+(WKL[1]-stripe)**2)
                 XB[(dot+stripe)%2]+=1
                 if dot in [1,6] and stripe in [1,6]:
                     score+=.4
             elif s==['W','+']:
-                score+=.8+4/(2+(BKL[0]-dot)**2+(BKL[1]-stripe)**2)
+                score+=.4+4/(2+(BKL[0]-dot)**2+(BKL[1]-stripe)**2)
                 if dot in [1,6] and stripe in [1,6]:
                     score-=.4
             elif s==['W','X']:
-                score+=.8+5/(2+(BKL[0]-dot)**2+(BKL[1]-stripe)**2)
+                score+=.4+5/(2+(BKL[0]-dot)**2+(BKL[1]-stripe)**2)
                 if dot in [1,6] and stripe in [1,6]:
                     score-=.4
                 XW[(dot+stripe)%2]+=1
@@ -243,8 +236,6 @@ def score(board,turn,boards):
 
     score+=XW[0]*XW[1]/4
     score-=XB[0]*XB[1]/4
-    if turn=='B':
-        score*=-1
     return score*2
 def score2(board,turn,boards,L):
     if winCheck(board):
@@ -354,68 +345,89 @@ def score2(board,turn,boards,L):
     if turn=='B':
         score*=-1
     return score*L[26]
-def NewAI(board,turn,time,boards,T=0):
-    if T==0:
-        DRAW(board,L)
-    M=getMoves(board,turn)
+def QAI(board,turn,difficulty,a=-100,b=100,inAI=True):
+    SC=score(board,turn,boards)
+    moves=[]
     K=deepcopy(board)
-    A2=deepcopy(boards)
-    M=len(getMoves(board,turn))
-    if M==0:
-        return([-100,1])
-    if T==2 and (time<=M or M==0):
-        return([-score(board,turn,boards),1])
-    if T==1 and (time<=M or M==0):
-        return(None)
-    TimeUsed=0
-    G=NewAI(board,turn,time/2,boards,T=1)
-    if not G==None:
-        moves=G[0]
-        time-=G[1]
-        TimeUsed+=G[1]
-        M=len(moves)
-    else:
-        m=getMoves(board,turn)
-        moves=[]
-        for move in m:
-            moves.append([0,move,0])
-        M=len(moves)
-    total=0
-    X=(time)**(1/2)
-    t=time-X
-    for move in moves:
-        total+=TimeUsed**(move[0]-moves[M-1][0])
-    for move in moves:
-        makeMove(move[1],board)
-
-        if turn=='B':
-            turn='W'
-        else:
-            turn='B'
-        A=round((t*(time)**(move[0]-moves[M-1][0]))/total+((time/(M**2))**1/2)-.5)
-        if A>move[2]:
-            S=NewAI(board,turn,A,A2+[board],T=2)
-            move[0]=S[0]
-            TimeUsed+=S[1]
-            move[2]=A
-        board=deepcopy(K)
-        A2=deepcopy(boards)
-        if turn=='B':
-            turn='W'
-        else:
-            turn='B'
-    moves.sort()
-    if T==1:
-        return([moves,TimeUsed])
-    if T==2:
-        #print(moves)
-        return([-moves[M-1][0],TimeUsed])
-    if T==0:
+    M=getMoves(board,turn)
+    if difficulty<1:
+        return score(board,turn,boards)
+    for move in M:
+        moves.append([-1000,move,True])
+    aa=a
+    bb=b
+    for i in range(difficulty):
+        a=aa
+        b=bb
+        if turn=='W':
+            V=-100
+            V2=-100
+            for move in moves:
+                if move[2]:
+                    makeMove(move[1],board)
+                    if turn=='B':
+                        turn='W'
+                    else:
+                        turn='B'
+                    V1=QAI(board,turn,i,a=a,b=b,inAI=True)
+                    V=max(V1,V)
+                    if V1<SC+1:
+                        move[2]=False
+                        move[0]=V1
+                    else:
+                        move[0]=V1
+                        if V2!=V:
+                            V2=V
+                        if V>=b:
+                            break
+                        
+                        a=max(a,V)
+                    board=deepcopy(K)
+                    if turn=='B':
+                        turn='W'
+                    else:
+                        turn='B'
+        elif turn=='B':
+            V=100
+            V2=100
+            for move in moves:
+                if move[2]:
+                    makeMove(move[1],board)
+                    if turn=='B':
+                        turn='W'
+                    else:
+                        turn='B'
+                    V1=QAI(board,turn,i,a=a,b=b,inAI=True)
+                    V=min(V1,V)
+                    if V1>SC-1:
+                        move[2]=False
+                        move[0]=-V1
+                    else:
+                        move[0]=-V1
+                        if V2!=V:
+                            V2=V
+                        if V<=a:
+                            break
+                        b=min(b,V)
+                    board=deepcopy(K)
+                    if turn=='B':
+                        turn='W'
+                    else:
+                        turn='B'
+        
+        moves.sort()
+        SC=V
+        #if not inAI:
+            #print(round(i/round(difficulty**(1/3))*100)/100)
+    if inAI:
+        if len(moves)==0:
+            return -100
+        return V
+    if not inAI:
         print(moves)
-        print(moves[M-1][0])
-        print(TimeUsed)
-        return(moves[M-1][1])
-def AI (board,turn,difficulty,boards,inAI=False,test=False):
+        print(round(100*moves[len(moves)-1][0])/100)
+    return moves[len(moves)-1][1]
+def AI(board,turn,difficulty,a=-100,b=100,inAI=False,test=False):
 
     if not inAI:
         DRAW(board,L)
@@ -423,67 +435,74 @@ def AI (board,turn,difficulty,boards,inAI=False,test=False):
     moves=[]
     K=deepcopy(board)
     M=getMoves(board,turn)
-    if difficulty<5:
-        if not test:
-            return score(board,turn,boards)
-        return score2(board,turn,boards,LL)
-    #boards.append(board)
+    if difficulty<1:
+        #return score(board,turn,boards)
+        return QAI(board,turn,1)
     for move in M:
-        moves.append([-101,move,0])
-    for i in range(round(difficulty**(1/5))):
-        C=((i)**2)*50+50
-        total=0
-        for move in moves:
-            try:
-                total+=(C)**((move[0]-moves[len(moves)-1][0])*C)
-            except:
-                continue
-        g=0
-        if i==0:
-            total*=2
-        for move in moves:
-            makeMove(move[1],board)
-
-            if turn=='B':
-                turn='W'
-            else:
-                turn='B'
-            if board in boards:
-                move[0]=0
-                board=deepcopy(K)
-                continue
-
-            try:
-                A=(difficulty**(2/3))*(C)**((move[0]-moves[len(moves)-1][0])*C)/total
-                round((difficulty**(2/3))*(C)**(move[0]*C)/total)
-            except:
-                continue
-
-            if move[1]==moves[-1][1] and move[2]<difficulty/10:
-
-                move[2]=difficulty/10
-                move[0]=-AI(board,turn,difficulty/10,boards+[deepcopy(board)],inAI=True,test=test)
-
-            elif A>move[2] and (moves[len(moves)-1][0]-1/((i+1)**2)<move[0]):
-                move[2]=A
-                move[0]=-AI(board,turn,A,boards+[deepcopy(board)],inAI=True,test=test)
-            board=deepcopy(K)
-            if turn=='B':
-                turn='W'
-            else:
-                turn='B'
+        moves.append([-1000,move])
+    aa=a
+    bb=b
+    for i in range(difficulty):
+        if not inAI:
+            print(i)
+        a=aa
+        b=bb
+        if turn=='W':
+            V=-100
+            V2=-100
+            for move in moves:
+                    makeMove(move[1],board)
+                    if turn=='B':
+                        turn='W'
+                    else:
+                        turn='B'
+                    V1=AI(board,turn,i,a=a,b=b,inAI=True,test=test)
+                    V=max(V1,V)
+                    move[0]=V1
+                    if V2!=V:
+                        move[0]=V
+                        V2=V
+                    if V>=b:
+                        break
+                    a=max(a,V)
+                    board=deepcopy(K)
+                    if turn=='B':
+                        turn='W'
+                    else:
+                        turn='B'
+        elif turn=='B':
+            V=100
+            V2=100
+            for move in moves:
+                    makeMove(move[1],board)
+                    if turn=='B':
+                        turn='W'
+                    else:
+                        turn='B'
+                    V1=AI(board,turn,i,a=a,b=b,inAI=True,test=test)
+                    V=min(V1,V)
+                    move[0]=-V1
+                    if V2!=V:
+                        move[0]=-V
+                        V2=V
+                    if V<=a:
+                        break
+                    b=min(b,V)
+                    board=deepcopy(K)
+                    if turn=='B':
+                        turn='W'
+                    else:
+                        turn='B'
+        
         moves.sort()
-        if i>2 and len(moves)>1:
-            if moves[len(moves)-1][2]==difficulty/5:
-                break
         #if not inAI:
             #print(round(i/round(difficulty**(1/3))*100)/100)
     if inAI:
         if len(moves)==0:
             return -100
-        return moves[len(moves)-1][0]
+        return V
     if not inAI:
-        #print(moves)
+        print(moves)
         print(round(100*moves[len(moves)-1][0])/100)
     return moves[len(moves)-1][1]
 def makeMove(move,board,L=[[0,0],[0,0]]):
@@ -603,29 +622,29 @@ while True:
         print('what difficulty do you want')
         answer=input()
         if answer=='random':
-            difficulty=2**3
+            difficulty=1
         if answer=='beginer-1':
-            difficulty=2**6
+            difficulty=2
         if answer=='beginer-2':
-            difficulty=2**9
+            difficulty=3
         if answer=='easy':
-            difficulty=2**12
+            difficulty=4
         if answer=='normal':
-            difficulty=2**15
+            difficulty=5
         if answer=='medium hard':
-            difficulty=2**18
+            difficulty=6
         if answer=='hard':
-            difficulty=2**21
+            difficulty=7
         if answer=='expert':
-            difficulty=2**24
+            difficulty=8
         if answer=='master':
-            difficulty=2**27
+            difficulty=9
         if answer=='grandmaster':
-            difficulty=2**30
+            difficulty=10
         if answer=='champion':
-            difficulty=2**33
+            difficulty=11
         if answer=='max':
-            difficulty=2**36
+            difficulty=12
         if answer=='battle':
             player='battle'
         if answer=='freeplay':
@@ -661,7 +680,7 @@ while True:
             boards.append(deepcopy(board))
             if game:
                 mem=deepcopy(board)
-                M=AI(mem,'B',difficulty,deepcopy(boards))
+                M=AI(mem,'B',difficulty)
                 move=M
 
                 print(str(move))
@@ -675,7 +694,7 @@ while True:
                 boards.append(deepcopy(board))
         elif player =='black':
             mem=deepcopy(board)
-            move=AI(mem,'W',difficulty,deepcopy(boards))
+            move=AI(mem,'W',difficulty)
             print(str(move))
             makeMove(move,board,L)
             if winCheck(board):
@@ -697,9 +716,9 @@ while True:
         else:
             mem=deepcopy(board)
             if WA:
-                move=AI(mem,'W',difficulty,deepcopy(boards),test=True)
+                move=AI(mem,'W',difficulty,test=True)
             else:
-                move=AI(mem,'W',difficulty,deepcopy(boards))
+                move=AI(mem,'W',difficulty)
             print(str(move))
             makeMove(move,board,L)
             if winCheck(board):
